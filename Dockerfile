@@ -54,4 +54,5 @@ EXPOSE 50000
 EXPOSE 8200-8220
 
 ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/docker-entrypoint.sh"]
-CMD ["bash","-lc","exec /usr/bin/java -jar /usr/share/java/jenkins.war --httpPort=8080"]
+CMD ["bash","-lc","exec /usr/bin/java -Djava.awt.headless=true -XX:+UseContainerSupport -jar /usr/share/jenkins/jenkins.war --httpPort=8080"]
+
