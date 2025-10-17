@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins
+    restart: unless-stopped
+
+    # Map requested port range (for future use), Jenkins UI, and agent port
+    ports:
+      - "8200-8220:8200-8220"   # generic range as requested
+      - "8200:8080"             # Jenkins Web UI -> http://localhost:8200
+      - "8210:50000"            # Jenkins inbound agents (JNLP) on 8210
+
+    environment:
+      # You can set extra JAVA_OPTS if you need reverse proxy, etc.
+      - JAVA_OPTS=
+      - JENKINS_HOME=/var/jenkins_home
+
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock:rw # Docker-from-host for building/running sibling containers
+
+    # Join a shared external network to talk to other containers by name
+    networks:
+      - default
+      - shared
+
+    # Optional: run as root so entrypoint can adjust group IDs, then gosu drops to 'jenkins'
+    user: "0:0"
+
+volumes:
+  jenkins_home:
+
+networks:
+  shared:
+    external: true
+    name: shared_net
