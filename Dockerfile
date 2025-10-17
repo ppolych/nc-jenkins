@@ -1,11 +1,6 @@
-# Base: Debian 13.1 (Trixie) slim
 FROM debian:13.1-slim
 
-# -----------------------------
-# System setup
-# -----------------------------
-# Install minimal tools, Java 21 runtime, gosu, tini, and deps
-
+# --- Base tools + Java 21 runtime (Jenkins needs only JRE) ---
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -15,11 +10,7 @@ RUN set -eux; \
     ; \
     rm -rf /var/lib/apt/lists/*
 
-# -----------------------------
-# Official Docker CLI + Compose v2 (static binaries)
-# -----------------------------
-# We install the official Docker CLI from download.docker.com (NOT docker.io)
-# and the official Compose v2 plugin.
+# --- Official Docker CLI + Compose v2 (static) ---
 ARG DOCKER_CLI_VERSION=27.3.1
 ARG COMPOSE_VERSION=2.29.7
 RUN set -eux; \
@@ -38,10 +29,7 @@ RUN set -eux; \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
     rm -rf /tmp/docker /tmp/docker.tgz
 
-# -----------------------------
-# Jenkins installation (LTS)
-# -----------------------------
-# Add Jenkins stable repo and key, then install Jenkins package.
+# --- Jenkins LTS ---
 RUN set -eux; \
     curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | gpg --dearmor -o /usr/share/keyrings/jenkins.gpg; \
     echo "deb [signed-by=/usr/share/keyrings/jenkins.gpg] https://pkg.jenkins.io/debian-stable binary/" > /etc/apt/sources.list.d/jenkins.list; \
@@ -49,27 +37,18 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends jenkins; \
     rm -rf /var/lib/apt/lists/*
 
-# -----------------------------
-# Users & groups
-# -----------------------------
-# Ensure 'docker' group exists and add 'jenkins' to it (for /var/run/docker.sock usage).
+# --- Users & perms ---
 RUN set -eux; \
     if ! getent group docker >/dev/null; then groupadd -r docker; fi; \
     usermod -aG docker jenkins
-
-# Jenkins home
 ENV JENKINS_HOME=/var/jenkins_home
 RUN mkdir -p "$JENKINS_HOME" && chown -R jenkins:jenkins "$JENKINS_HOME"
 
-# -----------------------------
-# Entrypoint script
-# -----------------------------
+# --- Entrypoint ---
 ADD docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# -----------------------------
-# Networking
-# -----------------------------
+# --- Ports ---
 EXPOSE 8080
 EXPOSE 50000
 EXPOSE 8200-8220
