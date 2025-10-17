@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   jenkins:
     build:
@@ -8,49 +6,43 @@ services:
     container_name: jenkins
     restart: unless-stopped
 
-    # Publish the requested container range 8200-8220 on the host
-    # Jenkins will listen on 8200 inside the container, so no extra mapping is needed.
+    # Publish ports:
+    # - Keep your requested range (shifted to avoid 8200 collision)
+    # - UI on 8200 -> internal 8080
+    # - Agents on 8242 -> internal 50000
     ports:
-      - "8200-8220:8200-8220"
-      - "8242:50000"    # inbound agents (JNLP)
+      - "8201-8220:8201-8220"
+      - "8200:8080"
+      - "8242:50000"
 
     environment:
       - JAVA_OPTS=
       - JENKINS_HOME=/var/jenkins_home
 
-    # Force Jenkins to listen on 8200 inside the container
-    command: ["bash","-lc","exec /usr/bin/java -jar /usr/share/jenkins/jenkins.war --httpPort=8200"]
-
     volumes:
       - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock:rw  # Docker host socket for controlling sibling containers
+      - /var/run/docker.sock:/var/run/docker.sock:rw
 
     networks:
       - default
       - shared
       - edge
 
-    # Run as root so entrypoint can adjust group IDs; entrypoint will drop to 'jenkins'
     user: "0:0"
 
   nginx:
     image: nginx:stable-alpine
     container_name: jenkins-nginx
     restart: unless-stopped
-
-    # Expose HTTP externally (add 443 later if you set up TLS)
+    # Αν θες να τον χρησιμοποιείς, εκθέτεις 80 (και 443 αργότερα)
     ports:
       - "80:80"
       # - "443:443"
-
-    # Nginx will proxy to http://jenkins:8200
     volumes:
       - ./nginx/jenkins.conf:/etc/nginx/conf.d/jenkins.conf:ro
-      # - ./nginx/certs:/etc/nginx/certs:ro  # when you add TLS
-
+      # - ./nginx/certs:/etc/nginx/certs:ro
     depends_on:
       - jenkins
-
     networks:
       - edge
       - shared
