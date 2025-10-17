@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   jenkins:
     build:
@@ -8,24 +6,36 @@ services:
     container_name: jenkins
     restart: unless-stopped
 
+    # Publish ports:
+    # - Map a generic host range 8221-8241 to container range 8200-8220 (as requested, shifted to avoid conflicts)
+    # - Expose Jenkins Web UI on host 8220 -> container 8080
+    # - Expose Jenkins inbound agent port on host 8242 -> container 50000
     ports:
-      - "8200-8220:8200-8220"   # generic range (requested)
-      - "8200:8080"             # Jenkins UI -> http://localhost:8200
-      - "8210:50000"            # inbound agents (JNLP)
+      - "8221-8241:8200-8220"
+      - "8220:8080"
+      - "8242:50000"
 
+    # Environment variables
     environment:
       - JAVA_OPTS=
       - JENKINS_HOME=/var/jenkins_home
 
+    # Volumes:
+    # - Persist Jenkins data
+    # - Mount Docker socket so Jenkins can control sibling containers on the host
     volumes:
       - jenkins_home:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock:rw  # talk to host Docker
+      - /var/run/docker.sock:/var/run/docker.sock:rw
 
+    # Networks:
+    # - Default network for local service wiring
+    # - External shared network to discover/talk to other containers by name
     networks:
       - default
       - shared
 
-    user: "0:0"   # entrypoint will drop to 'jenkins'
+    # Run as root so entrypoint can fix group IDs; entrypoint will drop to 'jenkins'
+    user: "0:0"
 
 volumes:
   jenkins_home:
