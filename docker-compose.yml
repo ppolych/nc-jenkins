@@ -6,14 +6,10 @@ services:
     container_name: jenkins
     restart: unless-stopped
 
-    # Publish ports:
-    # - Keep your requested range (shifted to avoid 8200 collision)
-    # - UI on 8200 -> internal 8080
-    # - Agents on 8242 -> internal 50000
     ports:
-      - "8201-8220:8201-8220"
-      - "8200:8080"
-      - "8242:50000"
+      - "8200:8080"      # UI
+      - "8242:50000"     # JNLP agents
+      - "8215:8215"      # extra port που ζήτησες
 
     environment:
       - JAVA_OPTS=
@@ -34,7 +30,6 @@ services:
     image: nginx:stable-alpine
     container_name: jenkins-nginx
     restart: unless-stopped
-    # Αν θες να τον χρησιμοποιείς, εκθέτεις 80 (και 443 αργότερα)
     ports:
       - "80:80"
       # - "443:443"
