@@ -29,12 +29,15 @@ RUN set -eux; \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
     rm -rf /tmp/docker /tmp/docker.tgz
 
-# --- Jenkins LTS WAR (download directly) ---
-# Store Jenkins under /opt/jenkins/jenkins.war to avoid package path issues.
+# --- Jenkins LTS WAR (download; auto-resolve current LTS) ---
 ENV JENKINS_HOME=/var/jenkins_home
 RUN set -eux; \
     mkdir -p /opt/jenkins "$JENKINS_HOME"; \
-    curl -fsSL "https://get.jenkins.io/war-stable/latest/jenkins.war" -o /opt/jenkins/jenkins.war
+    LTS_VER="$(curl -fsSL https://updates.jenkins.io/stable/latestCore.txt)"; \
+    curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war" -o /opt/jenkins/jenkins.war; \
+    curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war.sha256" -o /tmp/jenkins.war.sha256; \
+    echo "$(cat /tmp/jenkins.war.sha256)  /opt/jenkins/jenkins.war" | sha256sum -c -; \
+    rm -f /tmp/jenkins.war.sha256
 
 # --- Create 'jenkins' user and docker group; set permissions ---
 RUN set -eux; \
@@ -48,10 +51,11 @@ ADD docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # --- Ports ---
+# Jenkins: 8080 (UI), 50000 (JNLP)
+# Extra: expose 8200-8220 range as ζώνη θυρών (για μελλοντική χρήση/ομοιομορφία)
 EXPOSE 8080
 EXPOSE 50000
 EXPOSE 8200-8220
 
 ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/docker-entrypoint.sh"]
-# Run Jenkins from the downloaded WAR
 CMD ["bash","-lc","exec /usr/bin/java -jar /opt/jenkins/jenkins.war --httpPort=8080"]
