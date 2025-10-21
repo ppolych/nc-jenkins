@@ -6,10 +6,14 @@ services:
     container_name: jenkins
     restart: unless-stopped
 
+    # Exposed ports:
+    # - 8200 -> Jenkins UI (internal 8080)
+    # - 8242 -> JNLP agents (internal 50000)
+    # - 8215 -> extra port you requested (maps 1:1)
     ports:
-      - "8200:8080"      # UI
-      - "8242:50000"     # JNLP agents
-      - "8215:8215"      # extra port που ζήτησες
+      - "8200:8080"
+      - "8242:50000"
+      - "8215:8215"
 
     environment:
       - JAVA_OPTS=
@@ -19,25 +23,35 @@ services:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock:rw
 
+    # Connected to three networks (default, shared, edge)
     networks:
       - default
       - shared
       - edge
 
+    # Running as root (needed if you want full Docker socket access without extra setup)
     user: "0:0"
 
   nginx:
     image: nginx:stable-alpine
     container_name: jenkins-nginx
     restart: unless-stopped
+
+    # Publish HTTP on port 80 (enable 443 later if you add TLS)
     ports:
       - "80:80"
       # - "443:443"
+
     volumes:
+      # Nginx vhost for Jenkins reverse proxy
       - ./nginx/jenkins.conf:/etc/nginx/conf.d/jenkins.conf:ro
-      # - ./nginx/certs:/etc/nginx/certs:ro
+      # - ./nginx/certs:/etc/nginx/certs:ro  # Uncomment when you add TLS
+
+    # Start after Jenkins (basic dependency)
     depends_on:
       - jenkins
+
+    # Reverse proxy sits on edge + shared networks
     networks:
       - edge
       - shared
@@ -46,8 +60,11 @@ volumes:
   jenkins_home:
 
 networks:
+  # External shared network (must exist or be created beforehand)
   shared:
     external: true
     name: shared_net
+
+  # Local bridge network for this compose stack
   edge:
     driver: bridge
