@@ -1,4 +1,3 @@
-cat > Dockerfile <<'EOF'
 FROM debian:13.1-slim
 
 # --- Base tools + Java 21 runtime ---
