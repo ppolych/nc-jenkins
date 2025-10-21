@@ -1,40 +1,61 @@
- => ERROR [4/7] RUN set -eux;     mkdir -p /opt/jenkins "/var/jenkins_home";     LTS_VER="$(curl -fsSL https://updates.  3.4s
-------
- > [4/7] RUN set -eux;     mkdir -p /opt/jenkins "/var/jenkins_home";     LTS_VER="$(curl -fsSL https://updates.jenkins.io/stable/latestCore.txt)";     curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war" -o /opt/jenkins/jenkins.war;     curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war.sha256" -o /tmp/jenkins.war.sha256;     echo "$(cat /tmp/jenkins.war.sha256)  /opt/jenkins/jenkins.war" | sha256sum -c -;     rm -f /tmp/jenkins.war.sha256:
-0.168 + mkdir -p /opt/jenkins /var/jenkins_home
-0.172 + curl -fsSL https://updates.jenkins.io/stable/latestCore.txt
-0.905 + LTS_VER=2.528.1
-0.905 + curl -fsSL https://get.jenkins.io/war-stable/2.528.1/jenkins.war -o /opt/jenkins/jenkins.war
-2.667 + curl -fsSL https://get.jenkins.io/war-stable/2.528.1/jenkins.war.sha256 -o /tmp/jenkins.war.sha256
-3.309 + sha256sum -c -
-3.310 + cat /tmp/jenkins.war.sha256
-3.312 + echo d630dca265f75a8d581f127a9234f1679d4b0800a8f370d03ad4a154ceb7295b jenkins.war  /opt/jenkins/jenkins.war
-3.313 sha256sum: 'jenkins.war  /opt/jenkins/jenkins.war': No such file or directory
-3.313 jenkins.war  /opt/jenkins/jenkins.war: FAILED open or read
-3.313 sha256sum: WARNING: 1 listed file could not be read
-------
-Dockerfile:34
+cat > Dockerfile <<'EOF'
+FROM debian:13.1-slim
 
---------------------
+# --- Base tools + Java 21 runtime ---
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates curl gnupg git \
+      openjdk-21-jre-headless \
+      gosu tini \
+    ; \
+    rm -rf /var/lib/apt/lists/*
 
-  33 |     ENV JENKINS_HOME=/var/jenkins_home
+# --- Official Docker CLI + Compose v2 (static binaries) ---
+ARG DOCKER_CLI_VERSION=27.3.1
+ARG COMPOSE_VERSION=2.29.7
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64)  DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz"; COMPOSE_URL="https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64";; \
+      arm64)  DOCKER_URL="https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_CLI_VERSION}.tgz"; COMPOSE_URL="https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-aarch64";; \
+      *) echo "Unsupported arch: $arch" && exit 1;; \
+    esac; \
+    mkdir -p /usr/local/bin /usr/local/lib/docker/cli-plugins; \
+    curl -fsSL "$DOCKER_URL" -o /tmp/docker.tgz; \
+    tar -xzf /tmp/docker.tgz -C /tmp; \
+    mv /tmp/docker/docker /usr/local/bin/docker; \
+    chmod +x /usr/local/bin/docker; \
+    curl -fsSL "$COMPOSE_URL" -o /usr/local/lib/docker/cli-plugins/docker-compose; \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
+    rm -rf /tmp/docker /tmp/docker.tgz
 
-  34 | >>> RUN set -eux; \
+# --- Jenkins LTS WAR (auto-resolve τρέχουσα LTS + checksum verify) ---
+ENV JENKINS_HOME=/var/jenkins_home
+RUN set -eux; \
+    mkdir -p /opt/jenkins "$JENKINS_HOME"; \
+    LTS_VER="$(curl -fsSL https://updates.jenkins.io/stable/latestCore.txt)"; \
+    curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war" -o /opt/jenkins/jenkins.war; \
+    curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war.sha256" -o /opt/jenkins/jenkins.war.sha256; \
+    (cd /opt/jenkins && sha256sum -c jenkins.war.sha256); \
+    rm -f /opt/jenkins/jenkins.war.sha256
 
-  35 | >>>     mkdir -p /opt/jenkins "$JENKINS_HOME"; \
+# --- Create 'jenkins' user and docker group; set permissions ---
+RUN set -eux; \
+    groupadd -r jenkins; useradd -r -g jenkins -d "$JENKINS_HOME" -s /bin/bash jenkins; \
+    if ! getent group docker >/dev/null; then groupadd -r docker; fi; \
+    usermod -aG docker jenkins; \
+    chown -R jenkins:jenkins "$JENKINS_HOME" /opt/jenkins
 
-  36 | >>>     LTS_VER="$(curl -fsSL https://updates.jenkins.io/stable/latestCore.txt)"; \
+# --- Entrypoint (align docker.sock GID, then drop to jenkins) ---
+ADD docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-  37 | >>>     curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war" -o /opt/jenkins/jenkins.war; \
+# --- Ports ---
+EXPOSE 8080
+EXPOSE 50000
+EXPOSE 8200-8220
 
-  38 | >>>     curl -fsSL "https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war.sha256" -o /tmp/jenkins.war.sha256; \
-
-  39 | >>>     echo "$(cat /tmp/jenkins.war.sha256)  /opt/jenkins/jenkins.war" | sha256sum -c -; \
-
-  40 | >>>     rm -f /tmp/jenkins.war.sha256
-
-  41 |
-
---------------------
-
-failed to solve: process "/bin/sh -c set -eux;     mkdir -p /opt/jenkins \"$JENKINS_HOME\";     LTS_VER=\"$(curl -fsSL https://updates.jenkins.io/stable/latestCore.txt)\";     curl -fsSL \"https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war\" -o /opt/jenkins/jenkins.war;     curl -fsSL \"https://get.jenkins.io/war-stable/${LTS_VER}/jenkins.war.sha256\" -o /tmp/jenkins.war.sha256;     echo \"$(cat /tmp/jenkins.war.sha256)  /opt/jenkins/jenkins.war\" | sha256sum -c -;     rm -f /tmp/jenkins.war.sha256" did not complete successfully: exit code: 1
+ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/docker-entrypoint.sh"]
+CMD ["bash","-lc","exec /usr/bin/java -jar /opt/jenkins/jenkins.war --httpPort=8080"]
+EOF
