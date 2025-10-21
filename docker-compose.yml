@@ -9,7 +9,7 @@ services:
     # Exposed ports:
     # - 8200 -> Jenkins UI (internal 8080)
     # - 8242 -> JNLP agents (internal 50000)
-    # - 8215 -> extra port you requested (maps 1:1)
+    # - 8215 -> extra port you requested (1:1 mapping)
     ports:
       - "8200:8080"
       - "8242:50000"
@@ -29,7 +29,7 @@ services:
       - shared
       - edge
 
-    # Running as root (needed if you want full Docker socket access without extra setup)
+    # Running as root to ensure Docker socket access (as per your current setup)
     user: "0:0"
 
   nginx:
@@ -37,34 +37,21 @@ services:
     container_name: jenkins-nginx
     restart: unless-stopped
 
-    # Publish HTTP on port 80 (enable 443 later if you add TLS)
+    # Publish HTTP and HTTPS (HTTP is redirected to HTTPS in nginx/jenkins.conf)
     ports:
       - "80:80"
-      # - "443:443"
+      - "443:443"
 
     volumes:
-      # Nginx vhost for Jenkins reverse proxy
+      # Nginx vhost for Jenkins reverse proxy (includes HTTPS config)
       - ./nginx/jenkins.conf:/etc/nginx/conf.d/jenkins.conf:ro
-      # - ./nginx/certs:/etc/nginx/certs:ro  # Uncomment when you add TLS
+      # TLS certs: place fullchain.pem and privkey.pem here
+      - ./nginx/certs:/etc/nginx/certs:ro
 
-    # Start after Jenkins (basic dependency)
     depends_on:
       - jenkins
 
     # Reverse proxy sits on edge + shared networks
     networks:
       - edge
-      - shared
-
-volumes:
-  jenkins_home:
-
-networks:
-  # External shared network (must exist or be created beforehand)
-  shared:
-    external: true
-    name: shared_net
-
-  # Local bridge network for this compose stack
-  edge:
-    driver: bridge
+      - sh
