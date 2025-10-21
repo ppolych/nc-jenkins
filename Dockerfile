@@ -57,4 +57,3 @@ EXPOSE 8200-8220
 
 ENTRYPOINT ["/usr/bin/tini","--","/usr/local/bin/docker-entrypoint.sh"]
 CMD ["bash","-lc","exec /usr/bin/java -jar /opt/jenkins/jenkins.war --httpPort=8080"]
-EOF
